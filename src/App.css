@@ -1,38 +1,73 @@
-.App {
-  text-align: center;
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap");
+
+html,
+body,
+p {
+  margin: 0;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+html,
+body {
+  height: 100%;
+  width: 100%;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+#root {
+  background: #102438;
+  color: #ffffff;
+  font-family: "Noto Sans", sans-serif;
+  width: 100%;
+  height: 100%;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.container {
+  background: #ffffff0d;
   display: flex;
-  flex-direction: column;
+  box-sizing: border-box;
+  border-radius: 6px;
+  padding: 48px;
+  width: 1120px;
+  height: 480px;
+}
+
+.dropzone {
+  flex: 1 0 50%;
+  margin-right: 48px;
+  background: #ffffff0d;
+  border-radius: 6px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  cursor: pointer;
+  transition: background 0.2s ease-out;
+}
+.dropzone.hover {
+  background: #ffffff1d;
+  cursor: grabbing;
 }
 
-.App-link {
-  color: #61dafb;
+.dropzone_contents {
+  text-align: center;
+  font-size: 16px;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.filebutton {
+  background: #00000000;
+  border: 1px solid #ffffff;
+  border-radius: 6px;
+  background: none;
+  color: #ffffff;
+  font-size: 18px;
+  padding: 12px 24px;
+  margin-bottom: 8px;
+  transition: background 0.2s ease-out;
+  cursor: inherit;
 }
+.filebutton:hover {
+  background: #ffffff1f;
+}
+
+.fileinput {
+  display: none;
+}
+

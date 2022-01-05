@@ -1,0 +1,52 @@
+.infoarea {
+  flex: 1 1 50%;
+  display: flex;
+  flex-direction: column;
+}
+
+.empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font-size: 26px;
+  text-align: center;
+}
+
+.empty_small {
+  font-size: 18px;
+}
+
+.filelist {
+  flex-grow: 1;
+  overflow: scroll;
+}
+
+
+.fileinfo {
+  display: flex;
+  align-items: center;
+}
+
+.filename {
+  flex-grow: 1;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 0;
+}
+
+.filesize {
+  white-space: nowrap;
+  margin: 0 8px;
+  font-size: 14px;
+}
+
+.remove {
+  border: 0;
+  border-radius: 4px;
+  background: #ffffff1d;
+  padding: 0;
+  height: 16px;
+  width: 16px;
+}
