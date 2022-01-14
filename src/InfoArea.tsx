@@ -5,6 +5,7 @@ import "./InfoArea.css";
 interface Props {
   files: UploadFile[];
   removeFile: (n: number) => void;
+  upload: (files: File[]) => void;
 }
 
 function Empty() {
@@ -20,12 +21,12 @@ function Empty() {
   );
 }
 
-function List({ files, removeFile }: Props) {
+function List({ files, removeFile, upload }: Props) {
   return (
     <>
       <div className="filelist">
         {files.map((f, i) => (
-          <div className="fileinfo" key={f.id}>
+          <div className="fileinfo" key={f.key}>
             <p className="filename">{f.file.name}</p>
             <p className="filesize">{humanFileSize(f.file.size)}</p>
             <button className="remove" onClick={() => removeFile(i)}>
@@ -34,19 +35,20 @@ function List({ files, removeFile }: Props) {
           </div>
         ))}
       </div>
-      <button className="uploadbtn">Upload</button>
+      <button
+        className="uploadbtn"
+        onClick={() => upload(files.map((f) => f.file))}
+      >
+        Upload
+      </button>
     </>
   );
 }
 
-export function InfoArea({ files, removeFile }: Props) {
+export function InfoArea(props: Props) {
   return (
     <div className="infoarea">
-      {!files.length ? (
-        <Empty />
-      ) : (
-        <List files={files} removeFile={removeFile} />
-      )}
+      {!props.files.length ? <Empty /> : <List {...props} />}
     </div>
   );
 }

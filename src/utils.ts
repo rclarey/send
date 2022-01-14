@@ -1,12 +1,12 @@
+import { encode } from "./base64";
+
 export interface UploadFile {
   file: File;
-  id: string;
+  key: string;
 }
 
 export function randomString() {
-  return [...crypto.getRandomValues(new Uint8Array(20))]
-    .map((b) => b.toString(16))
-    .join("");
+  return encode(crypto.getRandomValues(new Uint8Array(18)));
 }
 
 export function humanFileSize(bytes: number) {
@@ -23,7 +23,7 @@ export function humanFileSize(bytes: number) {
 }
 export function isDescendant(
   a: HTMLElement | null,
-  b: HTMLElement | null
+  b: HTMLElement | null,
 ): boolean {
   if (!a || !b) {
     return false;
