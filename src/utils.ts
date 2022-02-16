@@ -5,6 +5,11 @@ export interface UploadFile {
   key: string;
 }
 
+export interface UploadOptions {
+  key: string;
+  expires: number;
+}
+
 export function randomString() {
   return encode(crypto.getRandomValues(new Uint8Array(18)));
 }

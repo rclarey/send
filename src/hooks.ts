@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { decode } from "./base64";
+import { decode, encode } from "./base64";
+import { poolIterable } from "./pool";
 import { speed } from "./speedometer";
-import { humanFileSize } from "./utils";
-
-const oneDay = 60 * 60 * 24;
+import { humanFileSize, UploadFile, UploadOptions } from "./utils";
 
 async function get(endpoint: string, params: Record<string, string> = {}) {
   const search = new URLSearchParams(params).toString();
@@ -55,76 +54,177 @@ function getSymmetricKey() {
   );
 }
 
+async function encrypt(
+  file: File,
+  key: CryptoKey,
+  folder: string,
+): Promise<{ iv: ArrayBuffer; bytes: ArrayBuffer }> {
+  const data = await file.arrayBuffer();
+  const iv = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(folder + file.name),
+  );
+
+  return {
+    iv,
+    bytes: await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, data),
+  };
+}
+
 export interface UploadResult {
+  iv: Uint8Array;
   fileId: string;
   fileName: string;
-  iv: Uint8Array;
 }
 
 export type UploadProgress =
-  | { type: "wait" }
+  | { type: "wait_enc" }
   | { type: "enc" }
+  | { type: "wait_up" }
   | { type: "up"; percent: number }
   | { type: "fail" }
   | { type: "done" };
 
-export function useUpload() {
+type ProgressFn = (key: string, p: UploadProgress) => void;
+
+async function upload({
+  key,
+  name,
+  bytes,
+  token,
+  rootFolder,
+  server,
+  expires,
+  onProgress,
+}: {
+  key: string;
+  name: string;
+  bytes: ArrayBuffer;
+  token: string;
+  rootFolder: string;
+  server: string;
+  expires: number;
+  onProgress: ProgressFn;
+}) {
+  const body = new FormData();
+  body.set("file", new File([bytes], name));
+  body.set("token", token);
+  body.set("folderId", rootFolder);
+  body.set("expire", String(Math.floor(Date.now() / 1000) + expires));
+
+  return new Promise<Omit<UploadResult, "iv">>((resolve, reject) => {
+    const req = new XMLHttpRequest();
+    req.responseType = "json";
+    req.upload.onprogress = (e) =>
+      onProgress(key, { type: "up", percent: e.loaded / e.total });
+    req.onload = () => {
+      if (req.response?.data?.fileId && req.response?.data?.fileName) {
+        onProgress(key, { type: "done" });
+        resolve({
+          fileId: req.response.data.fileId,
+          fileName: req.response.data.fileName,
+        });
+      } else {
+        onProgress(key, { type: "fail" });
+        reject();
+      }
+    };
+    req.onerror = () => {
+      onProgress(key, { type: "fail" });
+      reject();
+    };
+    req.open("POST", `https://${server}.gofile.io/uploadFile`, true);
+    req.send(body);
+  });
+}
+
+export function useUpload(
+  files: UploadFile[],
+  { expires }: UploadOptions,
+  onProgress: ProgressFn,
+  onCompleted: (key: string, token: string, rootFolder: string) => void,
+) {
   const p = useMemo(
     () => Promise.all([getAccount(), getSymmetricKey(), getServer()]),
     [],
   );
 
+  const [uploaded, setUploaded] = useState<UploadResult[]>([]);
+
+  useEffect(() => {
+    if (uploaded.length >= files.length) {
+      (async () => {
+        const [{ token, rootFolder }, key] = await p;
+        const keyStr = encode(
+          new Uint8Array(await crypto.subtle.exportKey("raw", key)),
+        );
+        onCompleted(keyStr, token, rootFolder);
+      })();
+    }
+  }, [files.length, uploaded.length]);
+
   return {
-    p,
-    upload: async (file: File, onProgress: (p: UploadProgress) => void) => {
-      const [{ token, rootFolder }, key, server] = await p;
+    upload: async () => {
+      const [{ token, rootFolder }, encryptionKey, server] = await p;
 
-      onProgress({ type: "enc" });
+      const encryptIterable = poolIterable(
+        Math.max(1, navigator.hardwareConcurrency - 1),
+        files,
+        async ({ file, key }) => {
+          onProgress(key, { type: "enc" });
+          try {
+            const { bytes, iv } = await encrypt(
+              file,
+              encryptionKey,
+              rootFolder,
+            );
+            onProgress(key, { type: "wait_up" });
 
-      const data = await file.arrayBuffer();
-      const iv = await crypto.subtle.digest(
-        "SHA-256",
-        new TextEncoder().encode(rootFolder + file.name),
-      );
-      const encData = await crypto.subtle.encrypt(
-        { name: "AES-GCM", iv },
-        key,
-        data,
-      );
-
-      onProgress({ type: "up", percent: 0 });
-
-      const body = new FormData();
-      body.set("file", new File([encData], file.name));
-      body.set("token", token);
-      body.set("folderId", rootFolder);
-      body.set("expire", String(Math.floor(Date.now() / 1000) + oneDay));
-
-      return new Promise<UploadResult>((resolve, reject) => {
-        const req = new XMLHttpRequest();
-        req.responseType = "json";
-        req.upload.onprogress = (e) =>
-          onProgress({ type: "up", percent: e.loaded / e.total });
-        req.onload = () => {
-          if (req.response?.data?.fileId && req.response?.data?.fileName) {
-            onProgress({ type: "done" });
-            resolve({
-              fileId: req.response.data.fileId,
-              fileName: req.response.data.fileName,
-              iv: new Uint8Array(iv),
-            });
-          } else {
-            onProgress({ type: "fail" });
-            reject();
+            return {
+              key,
+              name: file.name,
+              bytes,
+              iv,
+            };
+          } catch (e) {
+            onProgress(key, { type: "fail" });
+            throw e;
           }
-        };
-        req.onerror = () => {
-          onProgress({ type: "fail" });
-          reject();
-        };
-        req.open("POST", `https://${server}.gofile.io/uploadFile`, true);
-        req.send(body);
-      });
+        },
+      );
+
+      const uploadIterable = poolIterable(
+        4,
+        encryptIterable,
+        async ({ key, name, bytes, iv }) => {
+          onProgress(key, { type: "up", percent: 0 });
+          try {
+            const { fileId, fileName } = await upload({
+              key,
+              name,
+              bytes,
+              token,
+              server,
+              rootFolder,
+              expires,
+              onProgress,
+            });
+
+            return {
+              iv: new Uint8Array(iv),
+              fileId,
+              fileName,
+            };
+          } catch (e) {
+            onProgress(key, { type: "fail" });
+            throw e;
+          }
+        },
+      );
+
+      for await (const result of uploadIterable) {
+        setUploaded((old) => old.concat(result));
+      }
     },
   };
 }
@@ -176,12 +276,12 @@ export function useFiles(token?: string, folderId?: string): UseFilesResult {
       }
 
       try {
-        const { contents } = await get("getContent", {
+        const { contents } = (await get("getContent", {
           token,
           contentId: folderId,
           websiteToken: "websiteToken",
           cache: "true",
-        }) as { contents: Contents };
+        })) as { contents: Contents };
 
         const files = Object.values(contents).filter((x) => x.type === "file");
         if (files.length === 0) {

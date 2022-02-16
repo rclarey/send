@@ -8,7 +8,9 @@ export function Layout({ children }: PropsWithChildren<{}>) {
   return (
     <div className="layout">
       <Nav />
-      {children}
+      <main className="main">
+        {children}
+      </main>
     </div>
   );
 }

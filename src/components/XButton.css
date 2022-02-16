@@ -1,0 +1,12 @@
+.xbutton {
+  padding: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 0;
+  cursor: pointer;
+  transition: background-color 0.1s ease-out;
+}
+.xbutton:focus-visible, .xbutton:hover {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.20);
+}

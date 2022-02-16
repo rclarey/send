@@ -39,7 +39,7 @@ export function Get() {
           <div key={file.id}>
             <span>
               {file.name} {humanFileSize(file.size)}
-              {p.type} {"percent" in p ? p.percent.toFixed(2) : ""}
+              {p.type} {"percent" in p ? (p.percent * 100).toFixed(2) : ""}
             </span>
             <button
               onClick={() =>
