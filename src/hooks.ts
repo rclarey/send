@@ -1,41 +1,56 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { decode, encode } from "./base64";
-import { poolIterable } from "./pool";
-import { speed } from "./speedometer";
-import { humanFileSize, UploadFile, UploadOptions } from "./utils";
+import { deferred } from "./deferred";
+import { pooledMap } from "./pool";
+import { speedometer } from "./speedometer";
+import { UploadFile, UploadOptions } from "./utils";
 
 async function get(endpoint: string, params: Record<string, string> = {}) {
   const search = new URLSearchParams(params).toString();
   const r = await fetch(`https://api.gofile.io/${endpoint}?${search}`);
   const json = await r.json();
+  if (json.status !== "ok") {
+    throw json;
+  }
   return json.data;
 }
 
 async function put(endpoint: string, data: Record<string, string>) {
-  const formData = new FormData();
-  for (const [key, value] of Object.entries(data)) {
-    formData.set(key, value);
-  }
+  const search = new URLSearchParams(data).toString();
   const r = await fetch(`https://api.gofile.io/${endpoint}`, {
     method: "PUT",
-    body: formData,
+    body: search,
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
   });
   const json = await r.json();
+  if (json.status !== "ok") {
+    throw json;
+  }
   return json.data;
 }
 
-async function getAccount(): Promise<{ token: string; rootFolder: string }> {
+async function getAccount(
+  expires: number
+): Promise<{ token: string; folder: string }> {
   const { token } = await get("createAccount");
   const { rootFolder } = await get("getAccountDetails", { token });
-  await put("setFolderOption", {
+  const { id: folder } = await put("createFolder", {
+    parentFolderId: rootFolder,
+    folderName: "asdfqwer",
     token,
-    folderId: rootFolder,
-    option: "public",
-    value: "true",
   });
 
-  return { token, rootFolder };
+  await put("setFolderOption", {
+    token,
+    folderId: folder,
+    option: "expire",
+    value: String(Math.floor(Date.now() / 1000) + expires),
+  });
+
+  return { token, folder };
 }
 
 async function getServer() {
@@ -50,19 +65,26 @@ function getSymmetricKey() {
       length: 256,
     },
     true,
-    ["encrypt"],
+    ["encrypt"]
   );
+}
+
+interface EncryptResult {
+  iv: ArrayBuffer;
+  bytes: ArrayBuffer;
+  name: string;
+  key: string;
 }
 
 async function encrypt(
   file: File,
   key: CryptoKey,
-  folder: string,
-): Promise<{ iv: ArrayBuffer; bytes: ArrayBuffer }> {
+  folder: string
+): Promise<Pick<EncryptResult, "iv" | "bytes">> {
   const data = await file.arrayBuffer();
   const iv = await crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(folder + file.name),
+    new TextEncoder().encode(folder + file.name)
   );
 
   return {
@@ -81,18 +103,18 @@ export type UploadProgress =
   | { type: "wait_enc" }
   | { type: "enc" }
   | { type: "wait_up" }
-  | { type: "up"; percent: number }
+  | { type: "up"; loaded: number; total: number; speed: number }
   | { type: "fail" }
-  | { type: "done" };
+  | { type: "done_up" };
 
 type ProgressFn = (key: string, p: UploadProgress) => void;
 
-async function upload({
+function upload({
   key,
   name,
   bytes,
   token,
-  rootFolder,
+  folder,
   server,
   expires,
   onProgress,
@@ -101,7 +123,7 @@ async function upload({
   name: string;
   bytes: ArrayBuffer;
   token: string;
-  rootFolder: string;
+  folder: string;
   server: string;
   expires: number;
   onProgress: ProgressFn;
@@ -109,33 +131,65 @@ async function upload({
   const body = new FormData();
   body.set("file", new File([bytes], name));
   body.set("token", token);
-  body.set("folderId", rootFolder);
+  body.set("folderId", folder);
   body.set("expire", String(Math.floor(Date.now() / 1000) + expires));
 
-  return new Promise<Omit<UploadResult, "iv">>((resolve, reject) => {
-    const req = new XMLHttpRequest();
-    req.responseType = "json";
-    req.upload.onprogress = (e) =>
-      onProgress(key, { type: "up", percent: e.loaded / e.total });
-    req.onload = () => {
-      if (req.response?.data?.fileId && req.response?.data?.fileName) {
-        onProgress(key, { type: "done" });
-        resolve({
-          fileId: req.response.data.fileId,
-          fileName: req.response.data.fileName,
+  const req = new XMLHttpRequest();
+  return {
+    cancel: () => req.abort(),
+    result: new Promise<Omit<UploadResult, "iv">>((resolve, reject) => {
+      const speed = speedometer();
+      let previous = 0;
+      req.responseType = "json";
+      req.upload.onprogress = (e) => {
+        onProgress(key, {
+          type: "up",
+          loaded: e.loaded,
+          total: e.total,
+          speed: speed(e.loaded - previous),
         });
-      } else {
+        previous = e.loaded;
+      };
+      req.onload = () => {
+        if (req.response?.data?.fileId && req.response?.data?.fileName) {
+          onProgress(key, { type: "done_up" });
+          resolve({
+            fileId: req.response.data.fileId,
+            fileName: req.response.data.fileName,
+          });
+        } else {
+          onProgress(key, { type: "fail" });
+          reject();
+        }
+      };
+      req.onerror = () => {
         onProgress(key, { type: "fail" });
         reject();
-      }
-    };
-    req.onerror = () => {
-      onProgress(key, { type: "fail" });
-      reject();
-    };
-    req.open("POST", `https://${server}.gofile.io/uploadFile`, true);
-    req.send(body);
+      };
+      req.onabort = () => reject();
+      req.open("POST", `https://${server}.gofile.io/uploadFile`, true);
+      req.send(body);
+    }),
+  };
+}
+
+export async function deleteFiles(ids: string[], token: string) {
+  const search = new URLSearchParams({
+    contentsId: ids.join(","),
+    token,
+  }).toString();
+  const r = await fetch(`https://api.gofile.io/deleteContent`, {
+    method: "DELETE",
+    body: search,
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
   });
+  const json = await r.json();
+  if (json.status !== "ok") {
+    throw json;
+  }
+  return json.data;
 }
 
 export function useUpload(
@@ -143,98 +197,149 @@ export function useUpload(
   { expires }: UploadOptions,
   onProgress: ProgressFn,
   onCompleted: (key: string, token: string, rootFolder: string) => void,
+  reset: () => void
 ) {
   const p = useMemo(
-    () => Promise.all([getAccount(), getSymmetricKey(), getServer()]),
-    [],
+    () => Promise.all([getAccount(expires), getSymmetricKey(), getServer()]),
+    []
   );
+  const cancelMap = useMemo(() => new Map<string, () => void>(), []);
 
   const [uploaded, setUploaded] = useState<UploadResult[]>([]);
 
   useEffect(() => {
-    if (uploaded.length >= files.length) {
+    if (files.length === 0) {
+      reset();
+    } else if (uploaded.length >= files.length) {
       (async () => {
-        const [{ token, rootFolder }, key] = await p;
+        const [{ token, folder }, key] = await p;
         const keyStr = encode(
-          new Uint8Array(await crypto.subtle.exportKey("raw", key)),
+          new Uint8Array(await crypto.subtle.exportKey("raw", key))
         );
-        onCompleted(keyStr, token, rootFolder);
+        onCompleted(keyStr, token, folder);
       })();
     }
   }, [files.length, uploaded.length]);
 
+  const doEncrypt = async (
+    { file, key }: UploadFile,
+    encryptionKey: CryptoKey,
+    folder: string
+  ) => {
+    onProgress(key, { type: "enc" });
+    const signal = deferred<never>();
+    cancelMap.set(key, () => {
+      signal.reject("cancelled");
+    });
+    try {
+      const { bytes, iv } = await Promise.race([
+        encrypt(file, encryptionKey, folder),
+        signal,
+      ]);
+      onProgress(key, { type: "wait_up" });
+
+      return {
+        key,
+        name: file.name,
+        bytes,
+        iv,
+      };
+    } catch (e) {
+      console.log(e);
+      onProgress(key, { type: "fail" });
+      throw e;
+    }
+  };
+
+  const doUpload = async (
+    { key, name, bytes, iv }: EncryptResult,
+    token: string,
+    server: string,
+    folder: string
+  ) => {
+    onProgress(key, {
+      type: "up",
+      loaded: 0,
+      total: bytes.byteLength,
+      speed: 0,
+    });
+    try {
+      const { cancel, result } = upload({
+        key,
+        name,
+        bytes,
+        token,
+        server,
+        folder,
+        expires,
+        onProgress,
+      });
+      cancelMap.set(key, cancel);
+
+      const { fileName, fileId } = await result;
+      cancelMap.set(key, () => {
+        setUploaded((old) => old.filter((x) => x.fileId !== fileId));
+        deleteFiles([fileId], token).catch(() => {});
+      });
+
+      return {
+        iv: new Uint8Array(iv),
+        fileId,
+        fileName,
+      };
+    } catch (e) {
+      console.log(e);
+      onProgress(key, { type: "fail" });
+      throw e;
+    }
+  };
+
   return {
-    upload: async () => {
-      const [{ token, rootFolder }, encryptionKey, server] = await p;
+    cancel: (key: string) => {
+      cancelMap.get(key)?.();
+      cancelMap.delete(key);
+    },
+    upload: async (key: string) => {
+      const file = files.find((f) => f.key === key);
+      if (file) {
+        try {
+          const [{ folder, token }, encryptionKey, server] = await p;
+          const encResult = await doEncrypt(file, encryptionKey, folder);
+          const uploadResult = await doUpload(encResult, token, server, folder);
+          setUploaded((old) => old.concat(uploadResult));
+        } catch {
+          onProgress(key, { type: "fail" });
+        }
+      }
+    },
+    uploadAll: async () => {
+      try {
+        const [{ token, folder }, encryptionKey, server] = await p;
 
-      const encryptIterable = poolIterable(
-        Math.max(1, navigator.hardwareConcurrency - 1),
-        files,
-        async ({ file, key }) => {
-          onProgress(key, { type: "enc" });
-          try {
-            const { bytes, iv } = await encrypt(
-              file,
-              encryptionKey,
-              rootFolder,
-            );
-            onProgress(key, { type: "wait_up" });
+        const encryptIterable = pooledMap(1, files, (file) =>
+          doEncrypt(file, encryptionKey, folder)
+        );
 
-            return {
-              key,
-              name: file.name,
-              bytes,
-              iv,
-            };
-          } catch (e) {
-            onProgress(key, { type: "fail" });
-            throw e;
-          }
-        },
-      );
+        const uploadIterable = pooledMap(4, encryptIterable, (data) =>
+          doUpload(data, token, server, folder)
+        );
 
-      const uploadIterable = poolIterable(
-        4,
-        encryptIterable,
-        async ({ key, name, bytes, iv }) => {
-          onProgress(key, { type: "up", percent: 0 });
-          try {
-            const { fileId, fileName } = await upload({
-              key,
-              name,
-              bytes,
-              token,
-              server,
-              rootFolder,
-              expires,
-              onProgress,
-            });
-
-            return {
-              iv: new Uint8Array(iv),
-              fileId,
-              fileName,
-            };
-          } catch (e) {
-            onProgress(key, { type: "fail" });
-            throw e;
-          }
-        },
-      );
-
-      for await (const result of uploadIterable) {
-        setUploaded((old) => old.concat(result));
+        for await (const result of uploadIterable) {
+          setUploaded((old) => old.concat(result));
+        }
+      } catch {
+        files.forEach((f) => onProgress(f.key, { type: "fail" }));
       }
     },
   };
 }
 
 export type DownloadProgress =
-  | { type: "wait" }
-  | { type: "down"; percent: number }
+  | { type: "wait_down" }
+  | { type: "down"; loaded: number; total: number; speed: number }
   | { type: "dec" }
   | { type: "fail" }
-  | { type: "done" };
+  | { type: "done_down" };
 
 async function importKey(strKey?: string) {
   if (!strKey) {
@@ -245,7 +350,7 @@ async function importKey(strKey?: string) {
     decode(strKey),
     { name: "AES-GCM" },
     true,
-    ["decrypt"],
+    ["decrypt"]
   );
 }
 
@@ -261,13 +366,13 @@ interface Contents {
 }
 
 export type UseFilesResult =
-  | { state: "fail"; files: null }
+  | { state: "fail"; files: null; reason: string }
   | { state: "wait"; files: null }
-  | { state: "done"; files: FileInfo[] };
+  | { state: "done"; files: FileInfo[]; removeFile: (key: string) => void };
 
 export function useFiles(token?: string, folderId?: string): UseFilesResult {
   const [files, setFiles] = useState<FileInfo[] | null>(null);
-  const [error, setError] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
 
   useEffect(() => {
     (async () => {
@@ -285,82 +390,110 @@ export function useFiles(token?: string, folderId?: string): UseFilesResult {
 
         const files = Object.values(contents).filter((x) => x.type === "file");
         if (files.length === 0) {
-          setError(true);
+          setError("unknown");
         } else {
           setFiles(files);
         }
-      } catch {
-        setError(true);
+      } catch (e: any) {
+        let reason = "unknown";
+        if (typeof e === "object" && typeof e?.status === "string") {
+          reason = e.status;
+        }
+        setError(reason);
       }
     })();
   }, []);
 
   if (error) {
-    return { files: null, state: "fail" };
+    return { files: null, state: "fail", reason: error };
   }
 
   if (!files) {
     return { files: null, state: "wait" };
   }
 
-  return { files, state: "done" };
+  return {
+    files,
+    state: "done",
+    removeFile: (key: string) => {
+      console.log("remove", key, "from", files);
+      setFiles((old) => old?.filter((f) => f.id !== key) ?? null);
+    },
+  };
 }
 
 export function useDownload(strKey?: string, token?: string, folder?: string) {
-  console.log("token", token);
   const p = useMemo(() => Promise.all([importKey(strKey)]), []);
+  const cancelMap = useMemo(() => new Map<string, () => void>(), []);
 
-  return async (
-    { name, directLink }: FileInfo,
-    onProgress: (p: DownloadProgress) => void,
-  ) => {
-    if (!strKey || !token || !folder) {
-      return;
-    }
+  return {
+    cancel: (key: string) => {
+      cancelMap.get(key)?.();
+      cancelMap.delete(key);
+    },
+    download: async (
+      { name, directLink, size, id }: FileInfo,
+      onProgress: (p: DownloadProgress) => void
+    ) => {
+      if (!strKey || !token || !folder) {
+        return;
+      }
 
-    const [key] = await p;
+      onProgress({
+        type: "down",
+        loaded: 0,
+        total: size,
+        speed: 0,
+      });
+      const [key] = await p;
 
-    onProgress({ type: "down", percent: 0 });
+      const encArr = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const speed = speedometer();
+        const req = new XMLHttpRequest();
+        cancelMap.set(id, () => req.abort());
+        req.responseType = "arraybuffer";
+        let previous = 0;
+        req.onprogress = (e) => {
+          onProgress({
+            type: "down",
+            loaded: e.loaded,
+            total: e.total,
+            speed: speed(e.loaded - previous),
+          });
+          previous = e.loaded;
+        };
+        req.onload = () => resolve(req.response);
+        req.onerror = () => {
+          onProgress({ type: "fail" });
+          reject();
+        };
+        req.onabort = () => reject();
+        req.open(
+          "GET",
+          directLink.replace(/store.*\.gofile\.io/, "send-dl.deno.dev") +
+            `?token=${token}`
+        );
+        req.send();
+      });
 
-    const encArr = await new Promise<ArrayBuffer>((resolve, reject) => {
-      const req = new XMLHttpRequest();
-      req.responseType = "arraybuffer";
-      const rate = speed();
-      let bytes = 0;
-      req.onprogress = (e) => {
-        onProgress({ type: "down", percent: e.loaded / e.total });
-        console.log(humanFileSize(rate(e.loaded - bytes)));
-        bytes = e.loaded;
-      };
-      req.onload = () => resolve(req.response);
-      req.onerror = () => {
-        onProgress({ type: "fail" });
-        reject();
-      };
-      req.open(
-        "GET",
-        directLink.replace(/store.\.gofile\.io/, "send-dl.deno.dev") +
-          `?token=${token}`,
+      const signal = deferred<never>();
+      cancelMap.set(id, () => signal.reject("cancelled"));
+      onProgress({ type: "dec" });
+      const iv = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(folder + name)
       );
-      req.send();
-    });
-
-    onProgress({ type: "dec" });
-    const iv = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(folder + name),
-    );
-    const decArr = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv },
-      key,
-      encArr,
-    );
-    onProgress({ type: "done" });
-    const url = URL.createObjectURL(new File([decArr], name));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = name;
-    link.target = "_blank";
-    link.click();
+      const decArr = await Promise.race([
+        signal,
+        crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encArr),
+      ]);
+      onProgress({ type: "done_down" });
+      const url = URL.createObjectURL(new File([decArr], name));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      link.target = "_blank";
+      link.click();
+    },
   };
 }

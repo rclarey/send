@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
-import { XButton } from "../../components/XButton";
+import { animated, useTransition } from "@react-spring/web";
+import { useMemo, useRef, useState } from "react";
+import { IconButton } from "../../components/IconButton";
 import { isDescendant, UploadFile, UploadOptions } from "../../utils";
 
 interface Props {
@@ -25,7 +26,7 @@ export function DropZone({ addFiles }: Pick<Props, "addFiles">) {
   const zoneRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  let className = "dropzone background";
+  let className = "dropzone";
   if (dragging) {
     className += " hover";
   }
@@ -68,6 +69,26 @@ function UploadOptionForm({
   removeFile,
   upload,
 }: Omit<Props, "addFiles">) {
+  const refMap = useMemo(() => new WeakMap(), []);
+  const transition = useTransition(files, {
+    from: { opacity: 0, marginBottom: "24px" },
+    keys: (item) => item.key,
+    enter: (item) => async (next) => {
+      await next({
+        opacity: 1,
+        height: refMap.get(item)?.offsetHeight,
+        marginBottom: "16px",
+      });
+    },
+    leave: () => async (next) => {
+      await next({ opacity: 0 });
+      await next({ height: 0, marginBottom: "0px" });
+    },
+    trail: 50,
+    config: (_1, _2, state) =>
+      state === "leave" ? { tension: 300, clamp: true } : {},
+  });
+
   const [shareWith, setShareWith] = useState("");
   const shareWithOptions = [{ label: "Anyone with the link", value: "" }];
 
@@ -81,13 +102,22 @@ function UploadOptionForm({
   ];
 
   return (
-    <div className="background options">
+    <div className="options">
       <div className="options_list">
-        {files.map((f) => (
-          <div className="options_file" key={f.key}>
-            <p className="options_filename">{f.file.name}</p>
-            <XButton onClick={() => removeFile(f.key)} />
-          </div>
+        {transition((style, f) => (
+          <animated.div style={style}>
+            <div
+              className="options_file"
+              ref={(ref) => ref && refMap.set(f, ref)}
+            >
+              <p className="options_filename">{f.file.name}</p>
+              <IconButton
+                type="x"
+                onClick={() => removeFile(f.key)}
+                title="Remove file"
+              />
+            </div>
+          </animated.div>
         ))}
       </div>
       <div className="options_form">
@@ -132,6 +162,15 @@ function UploadOptionForm({
 }
 
 export function Selecting({ files, addFiles, removeFile, upload }: Props) {
+  const transition = useTransition(!files.length, {
+    initial: { opacity: 1 },
+    from: { opacity: 0 },
+    enter: { opacity: 1 },
+    leave: { opacity: 0 },
+    config: { tension: 300, clamp: true },
+    exitBeforeEnter: true,
+  });
+
   return (
     <div
       className="content"
@@ -144,14 +183,20 @@ export function Selecting({ files, addFiles, removeFile, upload }: Props) {
       }}
     >
       <TitleArea />
-      {files.length === 0 ? (
-        <DropZone addFiles={addFiles} />
-      ) : (
-        <UploadOptionForm
-          files={files}
-          removeFile={removeFile}
-          upload={upload}
-        />
+      {transition((style, hasFiles) =>
+        hasFiles ? (
+          <animated.div style={style} className="background">
+            <DropZone addFiles={addFiles} />
+          </animated.div>
+        ) : (
+          <animated.div style={style} className="background">
+            <UploadOptionForm
+              files={files}
+              removeFile={removeFile}
+              upload={upload}
+            />
+          </animated.div>
+        )
       )}
     </div>
   );

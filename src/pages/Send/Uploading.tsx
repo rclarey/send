@@ -1,18 +1,27 @@
 import { useEffect, useState } from "react";
+import { FileList } from "../../components/FileList";
 import { UploadProgress, useUpload } from "../../hooks";
 import { UploadFile, UploadOptions } from "../../utils";
 
 interface Props {
   options: UploadOptions;
   files: UploadFile[];
+  removeFile: (key: string) => void;
   finish: (url: string) => void;
+  reset: () => void;
 }
 
-export function Uploading({ options, files, finish }: Props) {
+export function Uploading({
+  options,
+  files,
+  removeFile,
+  finish,
+  reset,
+}: Props) {
   const [progress, setProgress] = useState<Record<string, UploadProgress>>(() =>
     Object.fromEntries(files.map((f) => [f.key, { type: "wait_enc" }]))
   );
-  const { upload } = useUpload(
+  const { cancel, upload, uploadAll } = useUpload(
     files,
     options,
     (key, p) =>
@@ -20,34 +29,31 @@ export function Uploading({ options, files, finish }: Props) {
         ...old,
         [key]: p,
       })),
-    (key, token, rootFolder) =>
+    (key, token, rootFolder) => {
       finish(
         new URL(
           `/get#${key}:${token}:${rootFolder}`,
-          window.location.origin,
-        ).toString(),
-      ),
+          window.location.origin
+        ).toString()
+      );
+    },
+    reset
   );
 
   useEffect(() => {
-    upload();
+    uploadAll();
   }, []);
 
   return (
-    <div>
-      {files.map(({ file, key }) => {
-        const p = progress[key];
-        return (
-          p && (
-            <div key={key}>
-              <div>{file.name}</div>
-              <div>
-                {p.type} {"percent" in p ? (p.percent * 100).toFixed(2) : ""}
-              </div>
-            </div>
-          )
-        );
-      })}
-    </div>
+    <FileList
+      className="content"
+      files={files.map((f) => ({ name: f.file.name, key: f.key }))}
+      progress={progress}
+      reload={upload}
+      remove={(key) => {
+        cancel(key);
+        removeFile(key);
+      }}
+    />
   );
 }

@@ -9,8 +9,9 @@ function addCorsHeaders(base?: Headers) {
 
 let server: string | null = null;
 const p = (async () => {
-  ({ data: { server } } = await (await fetch("https://api.gofile.io/getServer"))
-    .json());
+  ({
+    data: { server },
+  } = await (await fetch("https://api.gofile.io/getServer")).json());
 })();
 
 serve(async (req) => {
@@ -34,15 +35,3 @@ serve(async (req) => {
     headers,
   });
 });
-
-// const res = await fetch(
-//   "https://store1.gofile.io/download/76a31c0e-98b2-4ea9-a9b3-cb69bb69a050/background.jpg",
-//   {
-//     "headers": {
-//       "cookies": "accountToken=7JKz8h6yBX0iSUGcwOZvFaTXVT8j5Gyj",
-//     },
-//   },
-// );
-
-// const arr = new Uint8Array(await res.arrayBuffer());
-// console.log(arr.length);

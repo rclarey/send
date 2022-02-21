@@ -1,12 +1,18 @@
-.xbutton {
-  padding: 7px;
+.icon_button {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.12);
   border: 0;
+  padding: 0;
   cursor: pointer;
   transition: background-color 0.1s ease-out;
+  flex-shrink: 0;
 }
-.xbutton:focus-visible, .xbutton:hover {
+.icon_button:focus-visible, .xbutton:hover {
   outline: 0;
   background: rgba(255, 255, 255, 0.20);
 }

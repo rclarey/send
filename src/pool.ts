@@ -1,101 +1,90 @@
-class Deferred<T> extends Promise<T> {
-  #state: "pending" | "fulfilled" | "rejected";
-  #resolve!: (value: T | PromiseLike<T>) => void;
-  #reject!: (reason?: any) => void;
+// Modified from https://deno.land/std@0.120.0/async/pool.ts
+// Copyright 2018-2021 the Deno authors. All rights reserved. MIT license.
 
-  constructor() {
-    // assign to local variables first so we don't get errors about accessing
-    // this before super is called
-    let _resolve: (value: T | PromiseLike<T>) => void;
-    let _reject: (reason?: any) => void;
-    super((resolve, reject) => {
-      _resolve = resolve;
-      _reject = reject;
-    });
+// unique object we check by reference
+const throwValue = {};
 
-    this.#resolve = _resolve!;
-    this.#reject = _reject!;
-    this.#state = "pending";
-  }
-
-  get state() {
-    return this.#state;
-  }
-
-  async resolve(value: T | PromiseLike<T>) {
-    await value;
-    this.#state = "fulfilled";
-    this.#resolve(value);
-    return value;
-  }
-
-  reject(reason?: any) {
-    this.#state = "rejected";
-    this.#reject(reason);
-  }
-}
-
-export type Result<T> =
-  | { type: "ok"; value: T }
-  | { type: "error" };
-
-export async function* poolIterable<A, B>(
-  limit: number,
-  items: Iterable<A> | AsyncIterable<A>,
-  map: (item: A) => Promise<B>,
+/**
+ * pooledMap transforms values from an (async) iterable into another async
+ * iterable. The transforms are done concurrently, with a max concurrency
+ * defined by the poolLimit.
+ *
+ * If an error is thrown from `iterableFn`, no new transformations will begin.
+ * All currently executing transformations are allowed to finish and still
+ * yielded on success. After that, the rejections among them are gathered and
+ * thrown by the iterator in an `AggregateError`.
+ *
+ * @param poolLimit The maximum count of items being processed concurrently.
+ * @param array The input array for mapping.
+ * @param iteratorFn The function to call for every item of the array.
+ */
+export async function* pooledMap<T, R>(
+  poolLimit: number,
+  array: Iterable<T> | AsyncIterable<T>,
+  iteratorFn: (data: T) => Promise<R>
 ) {
-  const running: { key: number; d: Deferred<B | null> }[] = [];
-
-  let key = 0;
-  for await (const item of items) {
-    key += 1;
-    const d = new Deferred<B | null>();
-    d.resolve(
-      map(item).catch((e) => {
-        console.error(e);
-        return null;
-      }),
-    );
-
-    console.log("adding", key);
-    running.push({ key, d });
-    console.log("running has", running.length, "items");
-
-    if (running.length >= limit) {
-      console.log("racing");
-      // wait until some promise is done
-      await Promise.race(running.map((x) => x.d));
-      // yield all fulfilled promises
-      const done = running.filter((x) => x.d.state === "fulfilled");
-      for (const item of done) {
-        console.log("yielding", item.key, running.indexOf(item));
-        running.splice(running.findIndex((x) => x.key === item.key), 1);
-        const value = await item.d;
-        if (value !== null) {
-          console.log("success", item.key);
-          yield value;
+  // Create the async iterable that is returned from this function.
+  const res = new TransformStream<Promise<R>, R>({
+    async transform(
+      p: Promise<R>,
+      controller: TransformStreamDefaultController<R>
+    ) {
+      controller.enqueue(await p);
+    },
+  });
+  // Start processing items from the iterator
+  (async () => {
+    const writer = res.writable.getWriter();
+    const executing: Array<Promise<unknown>> = [];
+    try {
+      for await (const item of array) {
+        const p = Promise.resolve()
+          .then(() => iteratorFn(item))
+          .catch(() => throwValue);
+        // Only write on success. If we `writer.write()` a rejected promise,
+        // that will end the iteration. We don't want that yet. Instead let it
+        // fail the race, taking us to the catch block where all currently
+        // executing jobs are allowed to finish and all rejections among them
+        // can be reported together.
+        p.then((v) => {
+          if (v !== throwValue) {
+            writer.write(Promise.resolve(v as R));
+          }
+        });
+        const e: Promise<unknown> = p.then(() =>
+          executing.splice(executing.indexOf(e), 1)
+        );
+        executing.push(e);
+        if (executing.length >= poolLimit) {
+          await Promise.race(executing);
         }
       }
-    }
-  }
-  console.log("main for done");
-
-  while (running.length > 0) {
-    console.log("racing", running.length, running.map((x) => x.d));
-    // wait until some promise is done
-    await Promise.race(running.map((x) => x.d));
-    console.log("done race");
-    // yield all fulfilled promises
-    const done = running.filter((x) => x.d.state === "fulfilled");
-    console.log("done items", done.slice());
-    for (const item of done) {
-      console.log("yielding", item.key, running.indexOf(item));
-      running.splice(running.findIndex((x) => x.key === item.key), 1);
-      const value = await item.d;
-      if (value !== null) {
-        console.log("success", item.key);
-        yield value;
+      // Wait until all ongoing events have processed, then close the writer.
+      await Promise.all(executing);
+      writer.close();
+    } catch {
+      const errors = [];
+      for (const result of await Promise.allSettled(executing)) {
+        if (result.status == "rejected") {
+          errors.push(result.reason);
+        }
       }
+      writer
+        .write(
+          Promise.reject(
+            new Error(
+              "Threw while mapping.\n" + errors.map((e) => String(e)).join("\n")
+            )
+          )
+        )
+        .catch(() => {});
     }
+  })();
+
+  const reader = res.readable.getReader();
+  let chunk = await reader.read();
+  while (!chunk.done) {
+    yield chunk.value;
+    chunk = await reader.read();
   }
 }
