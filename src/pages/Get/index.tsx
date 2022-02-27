@@ -36,7 +36,7 @@ export function Get() {
   if (!key || !token || !folder) {
     return (
       <div className="middle">
-        <h1 className="titleArea">Invalid URL!</h1>
+        <h1 className="titlearea">Invalid URL!</h1>
       </div>
     );
   }
@@ -46,15 +46,6 @@ export function Get() {
       return (
         <div className="middle">
           <h1 className="titlearea">Sorry, these files have expired!</h1>
-        </div>
-      );
-    }
-    if (result.reason === "no-files") {
-      return (
-        <div className="middle">
-          <h1 className="titlearea">
-            Sorry, these files have been deleted or cannot be found!
-          </h1>
         </div>
       );
     }
@@ -72,6 +63,16 @@ export function Get() {
       setProgress((old) => ({ ...old, [key]: p }))
     );
   };
+
+  if (result.files?.length === 0) {
+    return (
+      <div className="middle">
+        <h1 className="titlearea">
+          Sorry, these files have been deleted or cannot be found!
+        </h1>
+      </div>
+    );
+  }
 
   return (
     <div className="content">

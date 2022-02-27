@@ -389,11 +389,7 @@ export function useFiles(token?: string, folderId?: string): UseFilesResult {
         })) as { contents: Contents };
 
         const files = Object.values(contents).filter((x) => x.type === "file");
-        if (files.length === 0) {
-          setError("no-files");
-        } else {
-          setFiles(files);
-        }
+        setFiles(files);
       } catch (e: any) {
         let reason = "unknown";
         if (typeof e === "object" && typeof e?.status === "string") {
