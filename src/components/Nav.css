@@ -17,7 +17,7 @@
   color: #ffffffc0;
   text-decoration: none;
   border-radius: 6px;
-  padding: 0 16px;
+  padding: 12px 16px;
   margin: -12px 0;
 }
 .nav-link:hover {
@@ -32,18 +32,34 @@
   margin-left: 16px;
 }
 
-@media (max-width: 1087px) {
-  .nav-link, .nav-link:visited, .nav-link:active {
-    font-size: 22px;
-  }
-
-  .gh-icon {
-    height: 32px;
-    width: 32px;
+@media (max-width: 703px) {
+  .nav {
+    margin-bottom: 0;
+    justify-content: flex-start;
+    padding: 16px 32px;
   }
 
   .logo {
-    height: 32px;
-    width: auto;
+    display: none;
+  }
+
+  .nav-links {
+    flex-grow: 1;
+    justify-content: space-between;
+  }
+
+  .nav-link, .nav-link:visited, .nav-link:active {
+    font-size: 16px;
+    margin: -12px -16px;
+  }
+
+  .gh-link {
+    margin-left: 0;
+    padding: 12px 16px;
+  }
+
+  .gh-icon {
+    height: 16px;
+    width: 16px;
   }
 }

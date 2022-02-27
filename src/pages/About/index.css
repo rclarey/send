@@ -1,0 +1,8 @@
+.link, .link:active, .link:visited, .link:hover {
+  color: #8ab2db;
+}
+
+.about {
+  font-size: 20px;
+  margin-bottom: 32px;
+}

@@ -28,6 +28,11 @@ img, svg {
   font-family: "Open Sans", sans-serif;
   width: 100%;
   height: 100%;
+  overflow-y: scroll;
+}
+
+.middle {
+  transform: translateY(-114px);
 }
 
 .content {
@@ -37,7 +42,8 @@ img, svg {
   transform: translateY(-114px);
   display: flex;
   flex-direction: column;
-
+  flex-basis: fit-content;
+  flex-grow: 1;
 }
 
 .titlearea {
@@ -61,6 +67,10 @@ img, svg {
 
 
 @media (max-width: 1087px) {
+  .middle {
+    transform: translateY(-112px);
+  }
+
   .content {
     width: 640px;
     max-width: 640px;
@@ -74,5 +84,25 @@ img, svg {
 
   .titlearea_small {
     font-size: 22px;
+  }
+}
+
+@media (max-width: 703px) {
+  .middle {
+    transform: translateY(0px);
+  }
+
+  .hide-small {
+    display: none;
+  }
+
+  .content {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    padding: 16px;
+    transform: none;
+    justify-content: center;
   }
 }

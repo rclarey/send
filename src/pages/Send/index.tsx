@@ -38,7 +38,7 @@ export function Send() {
   return transition((styles, item) => {
     if (item.type === "selecting") {
       return (
-        <animated.div style={styles}>
+        <animated.div style={styles} className="send">
           <Selecting
             files={files}
             addFiles={addFiles}
@@ -51,7 +51,7 @@ export function Send() {
 
     if (item.type === "uploading") {
       return (
-        <animated.div style={styles}>
+        <animated.div style={styles} className="send">
           <Uploading
             options={item.options}
             files={files}
@@ -64,7 +64,7 @@ export function Send() {
     }
 
     return (
-      <animated.div style={styles}>
+      <animated.div style={styles} className="send">
         <Sharing url={item.url} />
       </animated.div>
     );

@@ -245,7 +245,7 @@ export function useUpload(
         iv,
       };
     } catch (e) {
-      console.log(e);
+      console.error(e);
       onProgress(key, { type: "fail" });
       throw e;
     }
@@ -288,7 +288,7 @@ export function useUpload(
         fileName,
       };
     } catch (e) {
-      console.log(e);
+      console.error(e);
       onProgress(key, { type: "fail" });
       throw e;
     }
@@ -390,7 +390,7 @@ export function useFiles(token?: string, folderId?: string): UseFilesResult {
 
         const files = Object.values(contents).filter((x) => x.type === "file");
         if (files.length === 0) {
-          setError("unknown");
+          setError("no-files");
         } else {
           setFiles(files);
         }
@@ -416,7 +416,6 @@ export function useFiles(token?: string, folderId?: string): UseFilesResult {
     files,
     state: "done",
     removeFile: (key: string) => {
-      console.log("remove", key, "from", files);
       setFiles((old) => old?.filter((f) => f.id !== key) ?? null);
     },
   };

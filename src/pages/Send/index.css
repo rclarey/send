@@ -214,3 +214,62 @@
     margin-top: 8px;
   }
 }
+
+@media (max-width: 703px) {
+  .send {
+    width: 100%;
+    height: 100%;
+  }
+
+  .dropzone.background {
+    background: 0;
+    flex-direction: row;
+    flex-grow: 0;
+    height: fit-content;
+  }
+
+  .dropzone.hover {
+    background: 0;
+    cursor: initial;
+  }
+
+  .dropzone_button {
+    flex-grow: 1;
+    font-size: 20px;
+    margin-bottom: 0;
+  }
+
+  .options_filename {
+    line-height: 1.4;
+    max-height: 4.2em;
+    white-space: normal;
+    overflow-y: hidden;
+  }
+
+  .options_form {
+    line-height: 2;
+  }
+
+  .select {
+    width: 100%;
+  }
+
+  .options_expires {
+    margin: 0;
+  }
+
+  .options_upload {
+    margin-top: 16px;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 703px) {
+  .sharing {
+    padding: 32px;
+  }
+
+  .sharing_url {
+    min-width: 0;
+  }
+}

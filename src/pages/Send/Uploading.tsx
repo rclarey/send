@@ -45,15 +45,16 @@ export function Uploading({
   }, []);
 
   return (
-    <FileList
-      className="content"
-      files={files.map((f) => ({ name: f.file.name, key: f.key }))}
-      progress={progress}
-      reload={upload}
-      remove={(key) => {
-        cancel(key);
-        removeFile(key);
-      }}
-    />
+    <div className="content">
+      <FileList
+        files={files.map((f) => ({ name: f.file.name, key: f.key }))}
+        progress={progress}
+        reload={upload}
+        remove={(key) => {
+          cancel(key);
+          removeFile(key);
+        }}
+      />
+    </div>
   );
 }

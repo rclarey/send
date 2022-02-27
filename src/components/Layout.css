@@ -11,3 +11,13 @@
   justify-content: center;
   flex-grow: 1;
 }
+
+@media (max-width: 703px) {
+  .layout {
+    flex-direction: column-reverse;
+  }
+
+  .main {
+    height: calc(100% - 72px);
+  }
+}

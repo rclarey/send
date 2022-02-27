@@ -10,9 +10,9 @@ interface Props {
   upload: (options: UploadOptions) => void;
 }
 
-function TitleArea() {
+function TitleArea({ className }: { className?: string }) {
   return (
-    <h1 className="titlearea">
+    <h1 className={(className ?? "") + " titlearea"}>
       Easy end-to-end encrypted file sharing
       <p className="titlearea_small">
         with download links that automatically expire
@@ -21,12 +21,15 @@ function TitleArea() {
   );
 }
 
-export function DropZone({ addFiles }: Pick<Props, "addFiles">) {
+export function DropZone({
+  addFiles,
+  style,
+}: Pick<Props, "addFiles"> & { style: {} }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const zoneRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  let className = "dropzone";
+  let className = "background dropzone";
   if (dragging) {
     className += " hover";
   }
@@ -40,7 +43,8 @@ export function DropZone({ addFiles }: Pick<Props, "addFiles">) {
         className="dropzone_input"
         onChange={(e) => addFiles(Array.from(e.target.files!))}
       />
-      <div
+      <animated.div
+        style={style}
         ref={zoneRef}
         className={className}
         onClick={() => inputRef.current?.click()}
@@ -58,8 +62,8 @@ export function DropZone({ addFiles }: Pick<Props, "addFiles">) {
         }}
       >
         <button className="dropzone_button">Select files</button>
-        <div>or drag and drop</div>
-      </div>
+        <div className="hide-small">or drag and drop</div>
+      </animated.div>
     </>
   );
 }
@@ -92,7 +96,7 @@ function UploadOptionForm({
   const [shareWith, setShareWith] = useState("");
   const shareWithOptions = [{ label: "Anyone with the link", value: "" }];
 
-  const [expires, setExpires] = useState("86400");
+  const [expires, setExpires] = useState("3600");
   const expiresOptions = [
     { label: "1 hour", value: "3600" },
     { label: "3 hours", value: "10800" },
@@ -182,20 +186,23 @@ export function Selecting({ files, addFiles, removeFile, upload }: Props) {
         e.preventDefault();
       }}
     >
-      <TitleArea />
       {transition((style, hasFiles) =>
         hasFiles ? (
-          <animated.div style={style} className="background">
-            <DropZone addFiles={addFiles} />
-          </animated.div>
+          <>
+            <TitleArea />
+            <DropZone addFiles={addFiles} style={style} />
+          </>
         ) : (
-          <animated.div style={style} className="background">
-            <UploadOptionForm
-              files={files}
-              removeFile={removeFile}
-              upload={upload}
-            />
-          </animated.div>
+          <>
+            <TitleArea className="hide-small" />
+            <animated.div style={style} className="background">
+              <UploadOptionForm
+                files={files}
+                removeFile={removeFile}
+                upload={upload}
+              />
+            </animated.div>
+          </>
         )
       )}
     </div>

@@ -33,7 +33,7 @@ function infoByProgress(p: UploadProgress | DownloadProgress) {
     const verb = p.type === "up" ? "Uploading" : "Downloading";
     return (
       <>
-        <p className="filelist_info">
+        <p className="filelist_info filelist_speed">
           {verb} at {humanFileSize(p.speed)}/s{" "}
           {timeLeft(p.total - p.loaded, p.speed)}
         </p>
@@ -93,7 +93,10 @@ export function FileList({
   stop,
   className,
 }: Props) {
-  const refMap = useMemo(() => new WeakMap(), []);
+  const refMap = useMemo(
+    () => new WeakMap<typeof files[0], HTMLDivElement>(),
+    []
+  );
   const transition = useTransition(files, {
     keys: (item) => item.key,
     from: { opacity: 0, marginBottom: "32px" },

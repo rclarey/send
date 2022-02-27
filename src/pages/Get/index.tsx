@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileList } from "./components/FileList";
-import { DeleteModal } from "./components/Modal";
-import { deleteFiles, DownloadProgress, useDownload, useFiles } from "./hooks";
+import { FileList } from "../../components/FileList";
+import { DeleteModal } from "../../components/Modal";
+import {
+  deleteFiles,
+  DownloadProgress,
+  useDownload,
+  useFiles,
+} from "../../hooks";
 
 function parseURL(): { key?: string; token?: string; folder?: string } {
   const hash = window.location.hash.slice(1);
@@ -29,15 +34,34 @@ export function Get() {
   }, [result.state]);
 
   if (!key || !token || !folder) {
-    return <h1 className="titleArea">Invalid URL!</h1>;
+    return (
+      <div className="middle">
+        <h1 className="titleArea">Invalid URL!</h1>
+      </div>
+    );
   }
 
   if (result.state === "fail") {
     if (result.reason === "error-expired") {
-      return <h1 className="titlearea">Sorry, these files have expired!</h1>;
+      return (
+        <div className="middle">
+          <h1 className="titlearea">Sorry, these files have expired!</h1>
+        </div>
+      );
+    }
+    if (result.reason === "no-files") {
+      return (
+        <div className="middle">
+          <h1 className="titlearea">
+            Sorry, these files have been deleted or cannot be found!
+          </h1>
+        </div>
+      );
     }
     return (
-      <h1 className="titlearea">Something went wrong, please try again</h1>
+      <div className="middle">
+        <h1 className="titlearea">Something went wrong, please try again</h1>
+      </div>
     );
   }
 
@@ -73,7 +97,6 @@ export function Get() {
             visible={!!pendingDelete}
             close={() => setPendingDelete(null)}
             action={() => {
-              console.log(pendingDelete);
               if (pendingDelete) {
                 cancel(pendingDelete);
                 deleteFiles([pendingDelete], token);

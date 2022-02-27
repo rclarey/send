@@ -34,7 +34,9 @@ function NavLink({ children, className = "", ...props }: LinkProps) {
 export function Nav() {
   return (
     <nav className="nav">
-      <Logo />
+      <Link to="/">
+        <Logo />
+      </Link>
       <div className="nav-links">
         <NavLink className="nav-link" to="/">
           Send

@@ -65,3 +65,27 @@
     margin-bottom: 8px;
   }
 }
+
+@media (max-width: 703px) {
+  .filelist {
+    padding: 16px;
+  }
+
+  .filelist_file {
+    margin: 0;
+  }
+
+  .filelist_name {
+    line-height: 1.4;
+    max-height: 4.2em;
+    white-space: normal;
+    overflow-y: hidden;
+  }
+
+  .filelist_speed {
+    line-height: 1.4;
+    height: 2.8em;
+    white-space: normal;
+    overflow-y: hidden;
+  }
+}

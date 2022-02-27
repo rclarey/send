@@ -1,10 +1,9 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-import { Get } from "./Get";
-import { Layout } from "./Layout";
-// import { MakeRequest } from "./MakeRequest";
-import { NotFound } from "./NotFound";
-// import { ReceiveRequest } from "./ReceiveRequest";
+import { Layout } from "./components/Layout";
+import { NotFound } from "./components/NotFound";
+import { About } from "./pages/About";
+import { Get } from "./pages/Get";
 import { Send } from "./pages/Send";
 
 import "./App.css";
@@ -21,8 +20,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<Send />} />
           <Route path="/get" element={<Get />} />
-          {/* <Route path="/make-request" element={<MakeRequest />} /> */}
-          {/* <Route path="/request" element={<ReceiveRequest />} /> */}
+          <Route path="/about" element={<About />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>
