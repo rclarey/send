@@ -384,7 +384,7 @@ export function useFiles(token?: string, folderId?: string): UseFilesResult {
         const { contents } = (await get("getContent", {
           token,
           contentId: folderId,
-          websiteToken: "websiteToken",
+          websiteToken: "12345",
           cache: "true",
         })) as { contents: Contents };
 
