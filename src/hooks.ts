@@ -470,8 +470,8 @@ export function useDownload(strKey?: string, token?: string, folder?: string) {
         req.open(
           "GET",
           link.replace(
-            /https...store.*\.gofile\.io/,
-            "http://localhost:8000",
+            /store.*\.gofile\.io/,
+            "send-dl.deno.dev",
           ) +
             `?token=${token}`,
         );
