@@ -16,7 +16,7 @@ function parseURL(): { key?: string; token?: string; folder?: string } {
 
 export function Get() {
   const [progress, setProgress] = useState<Record<string, DownloadProgress>>(
-    {}
+    {},
   );
   const [pendingDelete, setPendingDelete] = useState<null | string>(null);
   const { key, token, folder } = useMemo(parseURL, []);
@@ -27,8 +27,8 @@ export function Get() {
     if (result.state === "done") {
       setProgress(
         Object.fromEntries(
-          result.files.map((f) => [f.id, { type: "wait_down" }])
-        )
+          result.files.map((f) => [f.id, { type: "wait_down" }]),
+        ),
       );
     }
   }, [result.state]);
@@ -59,8 +59,9 @@ export function Get() {
   const loading = result.state === "wait" || Object.keys(progress).length === 0;
 
   const doDownload = (key: string) => {
-    download(result.files!.find((f) => f.id === key)!, (p) =>
-      setProgress((old) => ({ ...old, [key]: p }))
+    download(
+      result.files!.find((f) => f.id === key)!,
+      (p) => setProgress((old) => ({ ...old, [key]: p })),
     );
   };
 
@@ -77,9 +78,7 @@ export function Get() {
   return (
     <div className="content">
       <h1 className="titlearea">You've been sent some files!</h1>
-      {loading ? (
-        <div className="background" />
-      ) : (
+      {loading ? <div className="background" /> : (
         <>
           <FileList
             files={result.files.map((f) => ({ name: f.name, key: f.id }))}

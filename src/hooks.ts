@@ -33,7 +33,7 @@ async function put(endpoint: string, data: Record<string, string>) {
 }
 
 async function getAccount(
-  expires: number
+  expires: number,
 ): Promise<{ token: string; folder: string }> {
   const { token } = await get("createAccount");
   const { rootFolder } = await get("getAccountDetails", { token });
@@ -65,7 +65,7 @@ function getSymmetricKey() {
       length: 256,
     },
     true,
-    ["encrypt"]
+    ["encrypt"],
   );
 }
 
@@ -79,12 +79,12 @@ interface EncryptResult {
 async function encrypt(
   file: File,
   key: CryptoKey,
-  folder: string
+  folder: string,
 ): Promise<Pick<EncryptResult, "iv" | "bytes">> {
   const data = await file.arrayBuffer();
   const iv = await crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(folder + file.name)
+    new TextEncoder().encode(folder + file.name),
   );
 
   return {
@@ -197,11 +197,11 @@ export function useUpload(
   { expires }: UploadOptions,
   onProgress: ProgressFn,
   onCompleted: (key: string, token: string, rootFolder: string) => void,
-  reset: () => void
+  reset: () => void,
 ) {
   const p = useMemo(
     () => Promise.all([getAccount(expires), getSymmetricKey(), getServer()]),
-    []
+    [],
   );
   const cancelMap = useMemo(() => new Map<string, () => void>(), []);
 
@@ -214,7 +214,7 @@ export function useUpload(
       (async () => {
         const [{ token, folder }, key] = await p;
         const keyStr = encode(
-          new Uint8Array(await crypto.subtle.exportKey("raw", key))
+          new Uint8Array(await crypto.subtle.exportKey("raw", key)),
         );
         onCompleted(keyStr, token, folder);
       })();
@@ -224,7 +224,7 @@ export function useUpload(
   const doEncrypt = async (
     { file, key }: UploadFile,
     encryptionKey: CryptoKey,
-    folder: string
+    folder: string,
   ) => {
     onProgress(key, { type: "enc" });
     const signal = deferred<never>();
@@ -255,7 +255,7 @@ export function useUpload(
     { key, name, bytes, iv }: EncryptResult,
     token: string,
     server: string,
-    folder: string
+    folder: string,
   ) => {
     onProgress(key, {
       type: "up",
@@ -316,12 +316,16 @@ export function useUpload(
       try {
         const [{ token, folder }, encryptionKey, server] = await p;
 
-        const encryptIterable = pooledMap(1, files, (file) =>
-          doEncrypt(file, encryptionKey, folder)
+        const encryptIterable = pooledMap(
+          1,
+          files,
+          (file) => doEncrypt(file, encryptionKey, folder),
         );
 
-        const uploadIterable = pooledMap(4, encryptIterable, (data) =>
-          doUpload(data, token, server, folder)
+        const uploadIterable = pooledMap(
+          4,
+          encryptIterable,
+          (data) => doUpload(data, token, server, folder),
         );
 
         for await (const result of uploadIterable) {
@@ -350,7 +354,7 @@ async function importKey(strKey?: string) {
     decode(strKey),
     { name: "AES-GCM" },
     true,
-    ["decrypt"]
+    ["decrypt"],
   );
 }
 
@@ -358,7 +362,7 @@ interface FileInfo {
   id: string;
   name: string;
   size: number;
-  directLink: string;
+  link: string;
 }
 
 interface Contents {
@@ -427,8 +431,8 @@ export function useDownload(strKey?: string, token?: string, folder?: string) {
       cancelMap.delete(key);
     },
     download: async (
-      { name, directLink, size, id }: FileInfo,
-      onProgress: (p: DownloadProgress) => void
+      { name, link, size, id }: FileInfo,
+      onProgress: (p: DownloadProgress) => void,
     ) => {
       if (!strKey || !token || !folder) {
         return;
@@ -465,8 +469,11 @@ export function useDownload(strKey?: string, token?: string, folder?: string) {
         req.onabort = () => reject();
         req.open(
           "GET",
-          directLink.replace(/store.*\.gofile\.io/, "send-dl.deno.dev") +
-            `?token=${token}`
+          link.replace(
+            /https...store.*\.gofile\.io/,
+            "http://localhost:8000",
+          ) +
+            `?token=${token}`,
         );
         req.send();
       });
@@ -476,7 +483,7 @@ export function useDownload(strKey?: string, token?: string, folder?: string) {
       onProgress({ type: "dec" });
       const iv = await crypto.subtle.digest(
         "SHA-256",
-        new TextEncoder().encode(folder + name)
+        new TextEncoder().encode(folder + name),
       );
       const decArr = await Promise.race([
         signal,
@@ -484,11 +491,11 @@ export function useDownload(strKey?: string, token?: string, folder?: string) {
       ]);
       onProgress({ type: "done_down" });
       const url = URL.createObjectURL(new File([decArr], name));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = name;
-      link.target = "_blank";
-      link.click();
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = name;
+      anchor.target = "_blank";
+      anchor.click();
     },
   };
 }

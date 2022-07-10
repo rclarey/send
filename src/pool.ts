@@ -21,13 +21,13 @@ const throwValue = {};
 export async function* pooledMap<T, R>(
   poolLimit: number,
   array: Iterable<T> | AsyncIterable<T>,
-  iteratorFn: (data: T) => Promise<R>
+  iteratorFn: (data: T) => Promise<R>,
 ) {
   // Create the async iterable that is returned from this function.
   const res = new TransformStream<Promise<R>, R>({
     async transform(
       p: Promise<R>,
-      controller: TransformStreamDefaultController<R>
+      controller: TransformStreamDefaultController<R>,
     ) {
       controller.enqueue(await p);
     },
@@ -73,9 +73,10 @@ export async function* pooledMap<T, R>(
         .write(
           Promise.reject(
             new Error(
-              "Threw while mapping.\n" + errors.map((e) => String(e)).join("\n")
-            )
-          )
+              "Threw while mapping.\n" +
+                errors.map((e) => String(e)).join("\n"),
+            ),
+          ),
         )
         .catch(() => {});
     }

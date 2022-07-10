@@ -33,11 +33,11 @@ export function Uploading({
       finish(
         new URL(
           `/get#${key}:${token}:${rootFolder}`,
-          window.location.origin
-        ).toString()
+          window.location.origin,
+        ).toString(),
       );
     },
-    reset
+    reset,
   );
 
   useEffect(() => {

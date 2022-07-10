@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useTransition, animated } from "@react-spring/web";
+import { animated, useTransition } from "@react-spring/web";
 
 import "./Modal.css";
 
@@ -53,8 +53,8 @@ export function DeleteModal({ action, close, visible }: Props) {
               </div>
             </div>
           </animated.div>
-        )
+        ),
     ),
-    document.getElementById("root")!
+    document.getElementById("root")!,
   );
 }

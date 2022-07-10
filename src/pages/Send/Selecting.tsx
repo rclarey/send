@@ -77,17 +77,19 @@ function UploadOptionForm({
   const transition = useTransition(files, {
     from: { opacity: 0, marginBottom: "24px" },
     keys: (item) => item.key,
-    enter: (item) => async (next) => {
-      await next({
-        opacity: 1,
-        height: refMap.get(item)?.offsetHeight,
-        marginBottom: "16px",
-      });
-    },
-    leave: () => async (next) => {
-      await next({ opacity: 0 });
-      await next({ height: 0, marginBottom: "0px" });
-    },
+    enter: (item) =>
+      async (next) => {
+        await next({
+          opacity: 1,
+          height: refMap.get(item)?.offsetHeight,
+          marginBottom: "16px",
+        });
+      },
+    leave: () =>
+      async (next) => {
+        await next({ opacity: 0 });
+        await next({ height: 0, marginBottom: "0px" });
+      },
     trail: 50,
     config: (_1, _2, state) =>
       state === "leave" ? { tension: 300, clamp: true } : {},
@@ -187,23 +189,25 @@ export function Selecting({ files, addFiles, removeFile, upload }: Props) {
       }}
     >
       {transition((style, hasFiles) =>
-        hasFiles ? (
-          <>
-            <TitleArea />
-            <DropZone addFiles={addFiles} style={style} />
-          </>
-        ) : (
-          <>
-            <TitleArea className="hide-small" />
-            <animated.div style={style} className="background">
-              <UploadOptionForm
-                files={files}
-                removeFile={removeFile}
-                upload={upload}
-              />
-            </animated.div>
-          </>
-        )
+        hasFiles
+          ? (
+            <>
+              <TitleArea />
+              <DropZone addFiles={addFiles} style={style} />
+            </>
+          )
+          : (
+            <>
+              <TitleArea className="hide-small" />
+              <animated.div style={style} className="background">
+                <UploadOptionForm
+                  files={files}
+                  removeFile={removeFile}
+                  upload={upload}
+                />
+              </animated.div>
+            </>
+          )
       )}
     </div>
   );

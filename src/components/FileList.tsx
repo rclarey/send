@@ -95,22 +95,24 @@ export function FileList({
 }: Props) {
   const refMap = useMemo(
     () => new WeakMap<typeof files[0], HTMLDivElement>(),
-    []
+    [],
   );
   const transition = useTransition(files, {
     keys: (item) => item.key,
     from: { opacity: 0, marginBottom: "32px" },
-    enter: (item) => async (next) => {
-      await next({
-        opacity: 1,
-        height: refMap.get(item)?.offsetHeight,
-        marginBottom: "24px",
-      });
-    },
-    leave: () => async (next) => {
-      await next({ opacity: 0 });
-      await next({ height: 0, marginBottom: "0px" });
-    },
+    enter: (item) =>
+      async (next) => {
+        await next({
+          opacity: 1,
+          height: refMap.get(item)?.offsetHeight,
+          marginBottom: "24px",
+        });
+      },
+    leave: () =>
+      async (next) => {
+        await next({ opacity: 0 });
+        await next({ height: 0, marginBottom: "0px" });
+      },
     trail: 50,
     config: (_1, _2, state) =>
       state === "leave" ? { tension: 300, clamp: true } : {},
@@ -119,8 +121,8 @@ export function FileList({
     <div className={(className ?? "") + " background filelist"}>
       {transition((style, f) => {
         const p = progress[f.key];
-        const canDownload =
-          download && (p.type === "wait_down" || p.type === "done_down");
+        const canDownload = download &&
+          (p.type === "wait_down" || p.type === "done_down");
         const canStop = stop && (p.type === "down" || p.type === "dec");
 
         return (
@@ -163,11 +165,9 @@ export function FileList({
               <div className="filelist_row">{infoByProgress(p)}</div>
               <div
                 className="filelist_bar"
-                style={
-                  p.type !== "up" && p.type !== "down"
-                    ? { visibility: "hidden" }
-                    : undefined
-                }
+                style={p.type !== "up" && p.type !== "down"
+                  ? { visibility: "hidden" }
+                  : undefined}
               >
                 {(p.type === "up" || p.type === "down") && (
                   <div
