@@ -31,7 +31,13 @@ serve(async (req) => {
   headers.delete("origin");
   headers.delete("referer");
 
-  return fetch(`https://${server}.gofile.io${url.pathname}`, {
+  const res = await fetch(`https://${server}.gofile.io${url.pathname}`, {
     headers,
+  });
+  
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: addCorsHeaders(res.headers),
   });
 });
